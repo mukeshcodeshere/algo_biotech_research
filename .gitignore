@@ -4,6 +4,9 @@
 # Ignore CSV files (if used for intermediate data)
 *.csv
 
+# Ignore config.py files (if used for intermediate data)
+config.py
+config2.py
 # Ignore any other local data directory (like ticker_data) if you prefer
 ticker_data/
 

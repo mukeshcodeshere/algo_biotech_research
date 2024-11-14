@@ -1,10 +1,11 @@
 import datetime
 
 today_date = datetime.datetime.today().strftime('%Y-%m-%d')
+start_date = (datetime.datetime.today() - datetime.timedelta(days=30)).strftime('%Y-%m-%d') # PRIOR 30 DAYS
 
 CONFIG = {
     'TICKERS': ['PHAT','VRTX'],
-    'START_DATE': '2024-01-01',  # You can keep this static or update it to today's date
+    'START_DATE': start_date,  # You can keep this static or update it to today's date
     'END_DATE': today_date,  # This will set the END_DATE to today's date
     'BASE_DIR': 'ticker_data',
     'USER_AGENT': 'Your Name your@email.com',
