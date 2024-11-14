@@ -1,3 +1,5 @@
+# CLIENT SECRET EXPIRES IN 6 MONTHS
+
 # NEED APPROVAL FROM ADMIN
 from O365 import Account
 from O365.utils import FileSystemTokenBackend
