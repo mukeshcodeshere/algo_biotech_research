@@ -3,7 +3,7 @@
 
 # Ignore CSV files (if used for intermediate data)
 *.csv
-
+*.log
 # Ignore config.py files (if used for intermediate data)
 config.py
 config2.py
