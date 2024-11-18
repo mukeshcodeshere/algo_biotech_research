@@ -1,3 +1,5 @@
+# Run data_download.py before running tracker.py
+
 import sqlite3
 import pandas as pd
 from config import CONFIG
