@@ -2,97 +2,118 @@ import yfinance as yf
 import sqlite3
 import os
 from config import CONFIG
+from datetime import datetime, timedelta
+import logging
 
-def clear_database(conn):
-    """
-    Clears all tables from the SQLite database by dropping them.
-    """
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = cursor.fetchall()
+logging.basicConfig(level=logging.DEBUG)
 
-        # Drop each table in the database
-        for table in tables:
-            table_name = table[0]
-            print(f"Dropping table: {table_name}")
-            cursor.execute(f"DROP TABLE IF EXISTS {table_name};")
-        
-        conn.commit()
-        print("All tables cleared.")
-    except Exception as e:
-        print(f"Error clearing the database: {e}")
+def get_last_date_in_db(conn, ticker):
+    """
+    Fetch the most recent date available for a specific ticker in the database.
+    """
+    query = f"SELECT MAX(Date) FROM {ticker}"
+    cursor = conn.cursor()
+    cursor.execute(query)
+    last_date = cursor.fetchone()[0]
+    return last_date
 
 def create_table(conn, ticker):
     """
     Creates a table for the ticker if it doesn't exist.
     """
-    create_table_query = f'''
-    CREATE TABLE IF NOT EXISTS {ticker} (
-        Date TEXT PRIMARY KEY,
-        Open REAL,
-        High REAL,
-        Low REAL,
-        Close REAL,
-        Adj_Close REAL,
-        Volume INTEGER
-    );
-    '''
-    conn.execute(create_table_query)
-    conn.commit()
+    try:
+        create_table_query = f'''
+        CREATE TABLE IF NOT EXISTS {ticker} (
+            Date TEXT PRIMARY KEY,
+            Open REAL,
+            High REAL,
+            Low REAL,
+            Close REAL,
+            Adj_Close REAL,
+            Volume INTEGER
+        );
+        '''
+        conn.execute(create_table_query)
+        conn.commit()
+        logging.debug(f"Table for {ticker} created or already exists.")
+    except Exception as e:
+        logging.error(f"Error creating table for {ticker}: {e}")
 
 def insert_data(conn, ticker, data):
     """
     Inserts stock data into the SQLite database for a specific ticker.
     """
-    data.index = data.index.strftime('%Y-%m-%d')  # Convert Date index to string format
+    data.index = data.index.strftime('%Y-%m-%d %H:%M:%S')  # Ensure timestamp format (date + time)
 
     insert_query = f'''
     INSERT OR REPLACE INTO {ticker} (Date, Open, High, Low, Close, Adj_Close, Volume)
     VALUES (?, ?, ?, ?, ?, ?, ?);
     '''
-    
+
     rows = [tuple(x) for x in data.reset_index().values]
     conn.executemany(insert_query, rows)
     conn.commit()
 
-def download_data(tickers, start_date, end_date, db_path):
+def download_data(tickers, db_path):
+    logging.debug(f"Tracking tickers: {tickers}")
     """
     Downloads stock data for the given tickers and stores it in an SQLite database.
+    Downloads only the new data after the most recent date in the database.
     """
+    # Connect to the SQLite database
     conn = sqlite3.connect(db_path)
-
-    # Clear tables only at the beginning, not after data insertion
-    #clear_database(conn)
 
     for ticker in tickers:
         try:
-            print(f"Downloading data for {ticker}...")
-            data = yf.download(ticker, start=start_date, end=end_date)
-            
+            print(f"Preparing table for {ticker}...")
+
+            # Ensure the table exists in the database
+            create_table(conn, ticker)
+
+            # Get the last date available in the database
+            last_date = get_last_date_in_db(conn, ticker)
+
+            # If there's no data yet, set the start date to a very early date
+            if last_date is None:
+                last_date = '2024-11-12'
+
+            # Get today's date and calculate the end date (7 days from today, Yahoo Finance limit)
+            today = datetime.today()
+            seven_days_later = today + timedelta(days=7)
+            end_date = seven_days_later.strftime('%Y-%m-%d')
+
+            logging.debug(f"Downloading data from {last_date} to {end_date} for {ticker}")
+
+            # Download data starting from the last date to the calculated end date
+            data = yf.download(ticker, start=last_date, end=end_date, interval="1m", progress=False)
+
             if data.empty:
-                print(f"No data found for {ticker}. Skipping...")
+                print(f"No new data found for {ticker}. Skipping...")
                 continue
 
-            create_table(conn, ticker)
+            logging.debug(f"Data for {ticker}: {data.tail()}")
+
+            # Insert new data into the database
             insert_data(conn, ticker, data)
-            print(f"Data for {ticker} inserted into database.")
+            print(f"New data for {ticker} inserted into database.")
 
         except Exception as e:
             print(f"Error downloading data for {ticker}: {e}")
     
+    # Close the database connection
     conn.close()
 
 def main():
+    # Get the tickers from the configuration
     tickers = CONFIG['TICKERS']
-    start_date = CONFIG['START_DATE']
-    end_date = CONFIG['END_DATE']
     db_path = CONFIG['DATABASE_PATH']
 
-    download_data(tickers, start_date, end_date, db_path)
+    # Download the new data for all tickers
+    download_data(tickers, db_path)
 
+    # Download data for benchmark tickers
     benchmark_tickers = CONFIG['BENCHMARK_TICKERS']
-    download_data(benchmark_tickers, start_date, end_date, db_path)
+    download_data(benchmark_tickers, db_path)
 
 if __name__ == "__main__":
     main()
