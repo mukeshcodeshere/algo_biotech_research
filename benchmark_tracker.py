@@ -38,7 +38,7 @@ def calculate_percentage_change(start_price, end_price):
     """
     return ((end_price - start_price) / start_price) * 100
 
-def calculate_rsi(data, period=14):
+def calculate_rsi(data, period=14): # 14 days or 14 periods of time????
     """
     Calculates the Relative Strength Index (RSI) for a given price series.
     :param data: Pandas DataFrame with 'Close' prices
