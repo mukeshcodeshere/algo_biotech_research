@@ -10,6 +10,5 @@ CONFIG = {
     'BASE_DIR': 'ticker_data',
     'USER_AGENT': 'Your Name your@email.com',
     'BENCHMARK_TICKERS': ['XBI','SPY'],
-    'DATABASE_PATH':'ticker_data.db',
-    'NEON_DB_CONNECTION_STRING':r"postgresql://db_biotech_owner:t0KZ7pnguiFb@ep-shrill-smoke-a5xu8h2u.us-east-2.aws.neon.tech/db_biotech?sslmode=require"
+    'DATABASE_PATH':'ticker_data.db'
 }

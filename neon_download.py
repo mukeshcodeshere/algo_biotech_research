@@ -1,6 +1,5 @@
 import yfinance as yf
-import sqlite3
-import os
+import psycopg2
 from config import CONFIG
 from datetime import datetime, timedelta
 import logging
@@ -24,16 +23,17 @@ def create_table(conn, ticker):
     try:
         create_table_query = f'''
         CREATE TABLE IF NOT EXISTS {ticker} (
-            Date TEXT PRIMARY KEY,
+            Date TIMESTAMP PRIMARY KEY,
             Open REAL,
             High REAL,
             Low REAL,
             Close REAL,
             Adj_Close REAL,
-            Volume INTEGER
+            Volume BIGINT
         );
         '''
-        conn.execute(create_table_query)
+        cursor = conn.cursor()
+        cursor.execute(create_table_query)
         conn.commit()
         logging.debug(f"Table for {ticker} created or already exists.")
     except Exception as e:
@@ -41,26 +41,28 @@ def create_table(conn, ticker):
 
 def insert_data(conn, ticker, data):
     """
-    Inserts stock data into the SQLite database for a specific ticker.
+    Inserts stock data into the PostgreSQL database for a specific ticker.
     """
     data.index = data.index.strftime('%Y-%m-%d %H:%M:%S')  # Ensure timestamp format (date + time)
 
     insert_query = f'''
-    INSERT OR REPLACE INTO {ticker} (Date, Open, High, Low, Close, Adj_Close, Volume)
-    VALUES (?, ?, ?, ?, ?, ?, ?);
+    INSERT INTO {ticker} (Date, Open, High, Low, Close, Adj_Close, Volume)
+    VALUES (%s, %s, %s, %s, %s, %s, %s)
+    ON CONFLICT (Date) DO NOTHING;  -- Prevent duplicates if already inserted
     '''
     rows = [tuple(x) for x in data.reset_index().values]
-    conn.executemany(insert_query, rows)
+    cursor = conn.cursor()
+    cursor.executemany(insert_query, rows)
     conn.commit()
 
-def download_data(tickers, db_path):
+def download_data(tickers, db_connection_string):
     logging.debug(f"Tracking tickers: {tickers}")
     """
-    Downloads stock data for the given tickers and stores it in an SQLite database.
+    Downloads stock data for the given tickers and stores it in a Neon PostgreSQL database.
     Downloads only the new data after the most recent date in the database.
     """
-    # Connect to the SQLite database
-    conn = sqlite3.connect(db_path)
+    # Connect to the PostgreSQL database using connection string
+    conn = psycopg2.connect(db_connection_string)
 
     for ticker in tickers:
         try:
@@ -117,14 +119,14 @@ def download_data(tickers, db_path):
 def main():
     # Get the tickers from the configuration
     tickers = CONFIG['TICKERS']
-    db_path = CONFIG['DATABASE_PATH']
+    db_connection_string = CONFIG['NEON_DB_CONNECTION_STRING']  # This should be the Neon connection string
 
     # Download the new data for all tickers
-    download_data(tickers, db_path)
+    download_data(tickers, db_connection_string)
 
     # Download data for benchmark tickers
     benchmark_tickers = CONFIG['BENCHMARK_TICKERS']
-    download_data(benchmark_tickers, db_path)
+    download_data(benchmark_tickers, db_connection_string)
 
 if __name__ == "__main__":
     main()
